@@ -1,0 +1,496 @@
+{
+    "AWSTemplateFormatVersion": "2010-09-09",
+    "Description": "Create an Alb in myvpc with new Security Group",
+    "Resources": {
+        "myvpc": {
+            "Type": "AWS::EC2::VPC",
+            "Properties": {
+                "CidrBlock": "10.0.0.0/16",
+                "EnableDnsHostnames": true,
+                "EnableDnsSupport": true,
+                "Tags": [
+                    {
+                        "Key": "name",
+                        "Value": "myvpc"
+                    }
+                ]
+            }
+        },
+        "publicsubnet": {
+            "Type": "AWS::EC2::Subnet",
+            "Properties": {
+                "AvailabilityZone": {
+                    "Fn::Select": [
+                        0,
+                        {
+                            "Fn::GetAZs": ""
+                        }
+                    ]
+                },
+                "CidrBlock": "10.0.1.0/24",
+                "MapPublicIpOnLaunch": true,
+                "VpcId": {
+                    "Ref": "myvpc"
+                },
+                "Tags": [
+                    {
+                        "Key": "name",
+                        "Value": "publicsubnet"
+                    }
+                ]
+            }
+        },
+        "publicsubnet2": {
+            "Type": "AWS::EC2::Subnet",
+            "Properties": {
+                "AvailabilityZone": {
+                    "Fn::Select": [
+                        1,
+                        {
+                            "Fn::GetAZs": ""
+                        }
+                    ]
+                },
+                "CidrBlock": "10.0.3.0/24",
+                "MapPublicIpOnLaunch": true,
+                "VpcId": {
+                    "Ref": "myvpc"
+                },
+                "Tags": [
+                    {
+                        "Key": "name",
+                        "Value": "publicsubnet2"
+                    }
+                ]
+            }
+        },
+        "myigw": {
+            "Type": "AWS::EC2::InternetGateway",
+            "Properties": {
+                "Tags": [
+                    {
+                        "Key": "name",
+                        "Value": "myigw"
+                    }
+                ]
+            }
+        },
+        "attachmentgy": {
+            "Type": "AWS::EC2::VPCGatewayAttachment",
+            "Properties": {
+                "InternetGatewayId": {
+                    "Ref": "myigw"
+                },
+                "VpcId": {
+                    "Ref": "myvpc"
+                }
+            }
+        },
+        "routetable": {
+            "Type": "AWS::EC2::RouteTable",
+            "Properties": {
+                "Tags": [
+                    {
+                        "Key": "name",
+                        "Value": "routetable"
+                    }
+                ],
+                "VpcId": {
+                    "Ref": "myvpc"
+                }
+            }
+        },
+        "myroute": {
+            "Type": "AWS::EC2::Route",
+            "Properties": {
+                "RouteTableId": {
+                    "Ref": "routetable"
+                },
+                "DestinationCidrBlock": "0.0.0.0/0",
+                "GatewayId": {
+                    "Ref": "myigw"
+                }
+            }
+        },
+        "subnetassociation": {
+            "Type": "AWS::EC2::SubnetRouteTableAssociation",
+            "Properties": {
+                "RouteTableId": {
+                    "Ref": "routetable"
+                },
+                "SubnetId": {
+                    "Ref": "publicsubnet"
+                }
+            }
+        },
+        "subnetassociation3": {
+            "Type": "AWS::EC2::SubnetRouteTableAssociation",
+            "Properties": {
+                "RouteTableId": {
+                    "Ref": "routetable"
+                },
+                "SubnetId": {
+                    "Ref": "publicsubnet2"
+                }
+            }
+        },
+        "privatesubnet": {
+            "Type": "AWS::EC2::Subnet",
+            "Properties": {
+                "AvailabilityZone": {
+                    "Fn::Select": [
+                        0,
+                        {
+                            "Fn::GetAZs": ""
+                        }
+                    ]
+                },
+                "CidrBlock": "10.0.2.0/24",
+                "MapPublicIpOnLaunch": false,
+                "VpcId": {
+                    "Ref": "myvpc"
+                },
+                "Tags": [
+                    {
+                        "Key": "name",
+                        "Value": "privatesubnet"
+                    }
+                ]
+            }
+        },
+        "eip": {
+            "Type": "AWS::EC2::EIP",
+            "Properties": {
+                "Domain": "vpc",
+                "Tags": [
+                    {
+                        "Key": "name",
+                        "Value": "eip"
+                    }
+                ]
+            }
+        },
+        "natgw": {
+            "Type": "AWS::EC2::NatGateway",
+            "Properties": {
+                "AllocationId": {
+                    "Fn::GetAtt": [
+                        "eip",
+                        "AllocationId"
+                    ]
+                },
+                "SubnetId": {
+                    "Ref": "publicsubnet"
+                },
+                "Tags": [
+                    {
+                        "Key": "name",
+                        "Value": "natgw"
+                    }
+                ]
+            }
+        },
+        "privateroutetable": {
+            "Type": "AWS::EC2::RouteTable",
+            "Properties": {
+                "Tags": [
+                    {
+                        "Key": "name",
+                        "Value": "privateroutetable"
+                    }
+                ],
+                "VpcId": {
+                    "Ref": "myvpc"
+                }
+            }
+        },
+        "myrouteprivate": {
+            "Type": "AWS::EC2::Route",
+            "Properties": {
+                "RouteTableId": {
+                    "Ref": "privateroutetable"
+                },
+                "DestinationCidrBlock": "0.0.0.0/0",
+                "NatGatewayId": {
+                    "Ref": "natgw"
+                }
+            }
+        },
+        "subnetassociation2": {
+            "Type": "AWS::EC2::SubnetRouteTableAssociation",
+            "Properties": {
+                "RouteTableId": {
+                    "Ref": "privateroutetable"
+                },
+                "SubnetId": {
+                    "Ref": "privatesubnet"
+                }
+            }
+        },
+        "mysg": {
+            "Type": "AWS::EC2::SecurityGroup",
+            "Properties": {
+                "GroupDescription": "Allow shh and http",
+                "SecurityGroupIngress": [
+                    {
+                        "IpProtocol": "tcp",
+                        "FromPort": 22,
+                        "ToPort": 22,
+                        "CidrIp": "0.0.0.0/0"
+                    },
+                    {
+                        "IpProtocol": "tcp",
+                        "FromPort": 80,
+                        "ToPort": 80,
+                        "CidrIp": "0.0.0.0/0"
+                    }
+                ],
+                "VpcId": {
+                    "Ref": "myvpc"
+                }
+            }
+        },
+        "myinstance1": {
+            "Type": "AWS::EC2::Instance",
+            "Properties": {
+                "ImageId": "ami-02d26659fd82cf299",
+                "InstanceType": "t2.micro",
+                "KeyName": "server-1",
+                "SubnetId": {
+                    "Ref": "privatesubnet"
+                },
+                "SecurityGroupIds": [
+                    {
+                        "Ref": "mysg"
+                    }
+                ],
+                "BlockDeviceMappings": [
+                    {
+                        "DeviceName": "/dev/xvdf",
+                        "Ebs": {
+                            "VolumeSize": 10,
+                            "VolumeType": "gp3"
+                        }
+                    }
+                ]
+            }
+        },
+        "myinstance2": {
+            "Type": "AWS::EC2::Instance",
+            "Properties": {
+                "ImageId": "ami-07f07a6e1060cd2a8",
+                "InstanceType": "t2.micro",
+                "KeyName": "server-2",
+                "SubnetId": {
+                    "Ref": "privatesubnet"
+                },
+                "SecurityGroupIds": [
+                    {
+                        "Ref": "mysg"
+                    }
+                ],
+                "BlockDeviceMappings": [
+                    {
+                        "DeviceName": "/dev/xvdf",
+                        "Ebs": {
+                            "VolumeSize": 10,
+                            "VolumeType": "gp3"
+                        }
+                    }
+                ]
+            }
+        },
+        "myinstance3": {
+            "Type": "AWS::EC2::Instance",
+            "Properties": {
+                "ImageId": "ami-01f2711b72e050dbe",
+                "InstanceType": "t2.micro",
+                "KeyName": "server-3",
+                "SubnetId": {
+                    "Ref": "publicsubnet"
+                },
+                "SecurityGroupIds": [
+                    {
+                        "Ref": "mysg"
+                    }
+                ],
+                "BlockDeviceMappings": [
+                    {
+                        "DeviceName": "/dev/xvdf",
+                        "Ebs": {
+                            "VolumeSize": 10,
+                            "VolumeType": "gp3"
+                        }
+                    }
+                ],
+                "UserData": {
+                    "Fn::Base64": {
+                        "Fn::Join": [
+                            "",
+                            [
+                                "#!/bin/bash\n",
+                                "yum update -y\n",
+                                "yum install -y httpd\n",
+                                "systemctl start httpd\n",
+                                "systemctl enable httpd\n",
+                                "echo \"<h1>Hello from CloudFormation</h1>\" > /var/www/html/index.html\n"
+                            ]
+                        ]
+                    }
+                }
+            }
+        },
+        "myinstance4": {
+            "Type": "AWS::EC2::Instance",
+            "Properties": {
+                "ImageId": "ami-0b982602dbb32c5bd",
+                "InstanceType": "t2.micro",
+                "KeyName": "server-4",
+                "SubnetId": {
+                    "Ref": "publicsubnet"
+                },
+                "SecurityGroupIds": [
+                    {
+                        "Ref": "mysg"
+                    }
+                ],
+                "BlockDeviceMappings": [
+                    {
+                        "DeviceName": "/dev/xvdf",
+                        "Ebs": {
+                            "VolumeSize": 10,
+                            "VolumeType": "gp3"
+                        }
+                    }
+                ],
+                "UserData": {
+                    "Fn::Base64": {
+                        "Fn::Join": [
+                            "",
+                            [
+                                "#!/bin/bash\n",
+                                "yum update -y\n",
+                                "yum install -y httpd\n",
+                                "systemctl start httpd\n",
+                                "systemctl enable httpd\n",
+                                "echo \"<h1>Hello from CloudFormation</h1>\" > /var/www/html/index.html\n"
+                            ]
+                        ]
+                    }
+                }
+            }
+        },
+        "mybucket": {
+            "Type": "AWS::S3::Bucket",
+            "Properties": {
+                "BucketName": "macpln1406",
+                "VersioningConfiguration": {
+                    "Status": "Enabled"
+                },
+                "PublicAccessBlockConfiguration": {
+                    "BlockPublicAcls": false,
+                    "BlockPublicPolicy": false,
+                    "IgnorePublicAcls": false,
+                    "RestrictPublicBuckets": false
+                }
+            }
+        },
+        "mybucketpolicy": {
+            "Type": "AWS::S3::BucketPolicy",
+            "Properties": {
+                "Bucket": {
+                    "Ref": "mybucket"
+                },
+                "PolicyDocument": {
+                    "Version": "2012-10-17",
+                    "Statement": [
+                        {
+                            "Sid": "Statement1",
+                            "Effect": "Allow",
+                            "Principal": "*",
+                            "Action": "s3:*",
+                            "Resource": {
+                                "Fn::Sub": "arn:aws:s3:::${mybucket}/*"
+                            }
+                        }
+                    ]
+                }
+            }
+        },
+        "myalb": {
+            "Type": "AWS::ElasticLoadBalancingV2::LoadBalancer",
+            "Properties": {
+                "Name": "myalb",
+                "Subnets": [
+                    {
+                        "Ref": "publicsubnet"
+                    },
+                    {
+                        "Ref": "publicsubnet2"
+                    }
+                ],
+                "SecurityGroups": [
+                    {
+                        "Ref": "mysg"
+                    }
+                ],
+                "Type": "application",
+                "Tags": [
+                    {
+                        "Key": "Name",
+                        "Value": "Myalb"
+                    }
+                ]
+            }
+        },
+        "Mytargetgroup": {
+            "Type": "AWS::ElasticLoadBalancingV2::TargetGroup",
+            "Properties": {
+                "Name": "Mytargetgroup",
+                "Port": 80,
+                "Protocol": "HTTP",
+                "VpcId": {
+                    "Ref": "myvpc"
+                },
+                "Targets": [
+                    {
+                        "Id": {
+                            "Ref": "myinstance3"
+                        },
+                        "Port": 80
+                    },
+                    {
+                        "Id": {
+                            "Ref": "myinstance4"
+                        },
+                        "Port": 80
+                    }
+                ]
+            }
+        },
+        "MyListener": {
+            "Type": "AWS::ElasticLoadBalancingV2::Listener",
+            "Properties": {
+                "DefaultActions": [
+                    {
+                        "Type": "forward",
+                        "ForwardConfig": {
+                            "TargetGroups": [
+                                {
+                                    "TargetGroupArn": {
+                                        "Ref": "Mytargetgroup"
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                ],
+                "LoadBalancerArn": {
+                    "Ref": "myalb"
+                },
+                "Port": 80,
+                "Protocol": "HTTP"
+            }
+        }
+    }
+}
